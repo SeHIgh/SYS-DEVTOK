@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define DEBUG
+// #define DEBUG
 
 User users[MAX_USERS];
 int user_count = 0;
@@ -45,16 +45,16 @@ void print_user_info(const char *name)
     }
 }
 
-// 등수를 기준으로 삽입 정렬을 수행하는 함수
-void insert_and_sort(User *user_array, int count)
+// 특정 유저만 앞 유저들과 비교하여 삽입 정렬 수행
+void partial_insert_and_sort(User *user_array, int user_index, int count)
 {
-    for (int i = count - 1; i > 0; i--)
+    for (int i = user_index; i > 0; i--)
     {
         if (user_array[i].cumulative_time > user_array[i - 1].cumulative_time ||
             (user_array[i].cumulative_time == user_array[i - 1].cumulative_time &&
              user_array[i].continuous_time > user_array[i - 1].continuous_time))
         {
-            // 사용자 swap
+            // Swap
             User temp = user_array[i];
             user_array[i] = user_array[i - 1];
             user_array[i - 1] = temp;
@@ -75,11 +75,12 @@ void insert_and_sort(User *user_array, int count)
         }
     }
 
-    // 순위 갱신 (1부터 시작하도록)
+    // 최종적으로 등수 갱신 (배열 순서대로 등수 부여)
     for (int i = 0; i < count; i++)
     {
-        user_array[i].rank = i + 1; // 등수를 1부터 시작
+        user_array[i].rank = i + 1;
     }
+
 #ifdef DEBUG
     // 디버깅 출력: 순위 갱신 후 배열 상태
     printf("순위 갱신 후 배열 상태:\n");
@@ -124,7 +125,7 @@ int load_users(const char *filename)
     return count;
 }
 
-// 특정 유저의 정보를 파일에서 불러오는 함수
+// 특정 유저의 데이터를 파일에서 불러오는 함수
 int load_user_data(const char *filename, int *cumulative_time, int *continuous_time)
 {
     FILE *file = fopen(filename, "r");
@@ -179,10 +180,11 @@ void add_or_update_user(const char *name, int cumulative_time, int continuous_ti
         User new_user = {0, "", cumulative_time, continuous_time};
         strncpy(new_user.name, name, MAX_NAME_LENGTH - 1);
         users[user_count++] = new_user;
+        index = user_count - 1;
     }
 
-    // 삽입 정렬을 통해 순위 갱신
-    insert_and_sort(users, user_count);
+    // 갱신된 유저만 앞쪽 유저들과 비교하여 정렬
+    partial_insert_and_sort(users, index, user_count);
 
     // 이름 인덱스 갱신
     update_name_index();
@@ -226,17 +228,15 @@ unsigned int hash_function(const char *str)
     return hash % HASH_SIZE;
 }
 
-// (main 에서 사용할 함수) 유저 데이터를 불러오고 랭킹을 업데이트하며 저장하는 통합 함수
+// 통합 업데이트 및 저장 함수
 void update_and_save_ranking(const char *ranking_filename, const char *user_filename, const char *user_name)
 {
-    // 유저 데이터 로드
     if (load_users(ranking_filename) < 0)
     {
         printf("랭킹 파일을 불러오는 데 실패했습니다.\n");
         return;
     }
 
-    // 새 유저의 데이터 불러오기
     int new_cumulative_time, new_continuous_time;
     if (load_user_data(user_filename, &new_cumulative_time, &new_continuous_time) < 0)
     {
@@ -244,10 +244,8 @@ void update_and_save_ranking(const char *ranking_filename, const char *user_file
         return;
     }
 
-    // 유저 정보 추가/업데이트 및 랭킹 갱신
     add_or_update_user(user_name, new_cumulative_time, new_continuous_time);
 
-    // 갱신된 랭킹 정보를 파일에 저장
     save_users(ranking_filename);
 }
 
