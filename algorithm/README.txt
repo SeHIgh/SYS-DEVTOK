@@ -31,6 +31,12 @@ DevTok 메뉴얼
         (userB->continuous_time - userA->continuous_time)
         을 통해 연속 공부 시간이 더 큰 유저가 높은 순위를 갖도록 정렬
         3. 연속 공부 시간까지 같다면, 이름 순서에 관계없이 첫 번째로 등장한 유저가 더 높은 순위 유지
+    
+- 알고리즘 수정
+    quick sort -> insertion sort
+    qsort 는 정렬되지 않은 케이스가 많은 전체 데이터를 정렬 시에 적합 
+
+
 
 
 - 일자 받아오기
@@ -41,3 +47,11 @@ DevTok 메뉴얼
     2. 포맷 정해서 받아오기
         $ date +"%y%m%d%H%M%S"
         241111135708
+
+
+- 컴파일 방법
+    예시) 실행할 파일 : ranking.c, main.c
+    
+    $gcc main.c ranking.c -o (실행파일이름)
+
+    두 소스코드가 함께 컴파일 되면서, ranking.h 파일의 함수 및 구조체 선언도 컴파일에 자동 포함됨
