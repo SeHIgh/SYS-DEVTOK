@@ -1,153 +1,245 @@
-/**
- * register.c
- * ¡¢º” Ω√ ∏ﬁ¥∫ 3∞≥(µÓ∑œ, ¡¢º”, ≥™∞°±‚) ∂ÁøÚ
- * µÓ∑œ Ω√ ªÁøÎ¿⁄ ¿Ã∏ß ∆ƒ¿œ ª˝º∫
- */
-
 #include <stdio.h>
+#include <curses.h>
+#include <unistd.h>
 #include <termios.h>
 #include <dirent.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
-ino_t get_inode(char *);
-void printMenu();
+#define LEFT 50
+#define HEIGHT 5
+
 void tty_mode(int);
 void turnOffEchoAndIcanon();
 int find_filename(char *);
+void printMenuUI();
+void registerUser();
+void loginUser();
+void loginSuccessMenu();
 
 int main() {
-	char choice;
-	char* filename;
-	int flag = 0; // «¡∑Œ±◊∑• ¡æ∑· ¿ŒΩƒ
+    int flag = 0; // ÌîÑÎ°úÍ∑∏Îû® Ï¢ÖÎ£å ÌîåÎûòÍ∑∏
 
-	// ±‚¡∏ ¡§∫∏ πÈæ˜
-	tty_mode(0);
+    // Í∏∞Ï°¥ ÌÑ∞ÎØ∏ÎÑê ÏÑ§Ï†ï Î∞±ÏóÖ
+    tty_mode(0);
 
-	// Ω√¿€ Ω√ ECHO, ICANON bit ≤Ù±‚
-	turnOffEchoAndIcanon();
+    // ÏãúÏûë Ïãú ECHO, ICANON ÎπÑÌä∏ ÎÅÑÍ∏∞
+    turnOffEchoAndIcanon();
 
+    while (!flag) {
+        initscr(); // curses Ï¥àÍ∏∞Ìôî
+        clear();
 
-	while (1) {
-		printMenu();
+        // UI Ï∂úÎ†•
+        printMenuUI();
+        refresh();
 
-		choice = getchar();
-		printf("\n");
+        switch (getch()) {
+            case 'r': case 'R':
+                endwin(); // curses Ï¢ÖÎ£å
+                registerUser();
+                break;
 
-		switch (choice) {
-			case '1':
-				printf("µÓ∑œ«œΩ« ªÁøÎ¿⁄ ¿Ã∏ß¿ª ¿‘∑¬«ÿ¡÷ººø‰(1 ~ 256 bytes): ");
-				
-				// ¿Ã∏ß ¿‘∑¬πﬁ¿ª∂© ¿·±Ò º≥¡§ µ«µπ∏Æ±‚
-				tty_mode(1);
-				scanf("%s", filename);
+            case 'j': case 'J':
+                endwin(); // curses Ï¢ÖÎ£å
+                loginUser();
+                break;
 
-				if (find_filename(filename)) {
-					// µÓ∑œ Ω«∆–
-					// ¿ÃπÃ ¿÷¥¬ ªÁøÎ¿⁄ ¿Ã∏ß
-					printf("¿ÃπÃ ¿÷¥¬ ¿Ã∏ß¿‘¥œ¥Ÿ!\n");
-				} else {
-					// µÓ∑œ º∫∞¯
-					// ªÁøÎ¿⁄ ∆ƒ¿œ ∏∏µÈæÓ¡÷±‚
-					chdir("storage");
-					creat(filename, 0777);
-					printf("µÓ∑œ º∫∞¯!\n");
-					chdir("..");
-				}
+            case 'q': case 'Q':
+                flag = 1;
+                break;
 
-				tty_mode(0);
-				turnOffEchoAndIcanon();
+            default:
+                break;
+        }
 
-				break;
+        // Enter ÎåÄÍ∏∞
+        if (getch() == '\n') {
+            sleep(1);
+        }
 
-			case '2':
-				printf("¡¢º”«œΩ« ªÁøÎ¿⁄ ¿Ã∏ß¿ª ¿‘∑¬«ÿ¡÷ººø‰(1 ~ 256 bytes): ");
-				
-				// ¿Ã∏ß ¿‘∑¬πﬁ¿ª∂© ¿·±Ò º≥¡§ µ«µπ∏Æ±‚
-				tty_mode(1);
-				scanf("%s", filename);
+        endwin(); // curses Ï¢ÖÎ£å
+    }
 
-				if (find_filename(filename)) {
-					// ¡¢º” º∫∞¯
-					printf("¡¢º” º∫∞¯!\n");
-				} else {
-					printf("¡∏¿Á«œ¡ˆ æ ¥¬ ªÁøÎ¿⁄¿‘¥œ¥Ÿ!\n");
-				}
-
-				tty_mode(0);
-				turnOffEchoAndIcanon();
-
-				break;
-
-			case '3':
-				flag = 1;
-				break;
-		}
-		if (flag == 1)
-			break;
-		
-		choice = getchar();
-	}
-
-	// ∫πø¯ »ƒ «¡∑Œ±◊∑• ¡æ∑·
-	tty_mode(1);
-	printf("«¡∑Œ±◊∑• ¡æ∑·\n");
-	return 0;
+    // ÌÑ∞ÎØ∏ÎÑê ÏÑ§Ï†ï Î≥µÏõê ÌõÑ ÌîÑÎ°úÍ∑∏Îû® Ï¢ÖÎ£å
+    tty_mode(1);
+    printf("ÌîÑÎ°úÍ∑∏Îû® Ï¢ÖÎ£å\n");
+    return 0;
 }
 
-void turnOffEchoAndIcanon() {
-	// ECHO and ICANON bit ≤Ù±‚
-	struct termios info;
+void registerUser() {
+    char filename[257]; // ÏÇ¨Ïö©Ïûê Ïù¥Î¶Ñ Ï†ÄÏû•
 
-	tcgetattr(0, &info);
-	info.c_lflag &= ~ECHO;
-	info.c_lflag &= ~ICANON;
-	tcsetattr(0, TCSANOW, &info);
+    printf("Îì±Î°ùÌïòÏã§ ÏÇ¨Ïö©Ïûê Ïù¥Î¶ÑÏùÑ ÏûÖÎ†•Ìï¥Ï£ºÏÑ∏Ïöî(1 ~ 256 bytes): ");
+
+    // Ïù¥Î¶Ñ ÏûÖÎ†•Î∞õÏùÑ Îïå Ïû†Íπê ÏÑ§Ï†ï ÎêòÎèåÎ¶¨Í∏∞
+    tty_mode(1);
+    scanf("%256s", filename);
+
+    if (find_filename(filename)) {
+        // Îì±Î°ù Ïã§Ìå® - Ïù¥ÎØ∏ ÏûàÎäî ÏÇ¨Ïö©Ïûê Ïù¥Î¶Ñ
+        printf("Ïù¥ÎØ∏ ÏûàÎäî Ïù¥Î¶ÑÏûÖÎãàÎã§!\n");
+    } else {
+        // Îì±Î°ù ÏÑ±Í≥µ - ÏÇ¨Ïö©Ïûê ÌååÏùº ÏÉùÏÑ±
+        mkdir("users", 0777); // ÎîîÎ†âÌÜ†Î¶¨Í∞Ä ÏóÜÏúºÎ©¥ ÏÉùÏÑ±
+        chdir("users");
+        creat(filename, 0777);
+        printf("Îì±Î°ù ÏÑ±Í≥µ!\n");
+        chdir("..");
+    }
+
+    // ÏÑ§Ï†ï Î≥µÏõê Î∞è ECHO, ICANON ÎπÑÌä∏ ÎÅÑÍ∏∞
+    tty_mode(0);
+    turnOffEchoAndIcanon();
+}
+
+void loginUser() {
+    char filename[257]; // ÏÇ¨Ïö©Ïûê Ïù¥Î¶Ñ Ï†ÄÏû•
+
+    printf("Ï†ëÏÜçÌïòÏã§ ÏÇ¨Ïö©Ïûê Ïù¥Î¶ÑÏùÑ ÏûÖÎ†•Ìï¥Ï£ºÏÑ∏Ïöî(1 ~ 256 bytes): ");
+
+    // Ïù¥Î¶Ñ ÏûÖÎ†•Î∞õÏùÑ Îïå Ïû†Íπê ÏÑ§Ï†ï ÎêòÎèåÎ¶¨Í∏∞
+    tty_mode(1);
+    scanf("%256s", filename);
+
+    if (find_filename(filename)) {
+        // Ï†ëÏÜç ÏÑ±Í≥µ
+        printf("Ï†ëÏÜç ÏÑ±Í≥µ!\n");
+        sleep(1);
+        endwin();
+        loginSuccessMenu(); // Î°úÍ∑∏Ïù∏ ÏÑ±Í≥µ Ïãú ÏÉàÎ°úÏö¥ ÌôîÎ©¥
+    } else {
+        // Ï†ëÏÜç Ïã§Ìå® - Ï°¥Ïû¨ÌïòÏßÄ ÏïäÎäî ÏÇ¨Ïö©Ïûê
+        printf("Ï°¥Ïû¨ÌïòÏßÄ ÏïäÎäî ÏÇ¨Ïö©ÏûêÏûÖÎãàÎã§!\n");
+    }
+
+    // ÏÑ§Ï†ï Î≥µÏõê Î∞è ECHO, ICANON ÎπÑÌä∏ ÎÅÑÍ∏∞
+    tty_mode(0);
+    turnOffEchoAndIcanon();
 }
 
 int find_filename(char* filename) {
-	// ¿˙¿Âº“ ¡¢º” »ƒ ¿Ã∏ß¿Ã filename¿Œ ∆ƒ¿œ¿Ã ¿÷¿∏∏È 1, æ¯¿∏∏È 0 π›»Ø
+    // Ï†ÄÏû•ÏÜå ÎîîÎ†âÌÜ†Î¶¨ÏóêÏÑú ÌååÏùº Í≤ÄÏÉâ
 
-	DIR *dir_ptr = NULL;
-	struct dirent *dirent_ptr = NULL;
+    DIR *dir_ptr;
+    struct dirent *dirent_ptr;
 
-	filename = strcat(filename, ".txt");
+    strcat(filename, ".txt");
 
-	// ¿˙¿Âº“ ¡¢º”(æ¯¿∏∏È ª˝º∫)
-	if ((dir_ptr = opendir("storage")) == NULL) {
-		if (mkdir("storage", 0777) == -1) {
-			exit(EXIT_FAILURE);
-		}
-		dir_ptr = opendir("storage");
-	}
+    if ((dir_ptr = opendir("users")) == NULL) {
+        mkdir("users", 0777);
+        return 0; // ÎîîÎ†âÌÜ†Î¶¨Í∞Ä ÏóÜÏúºÎ©¥ ÌååÏùºÎèÑ ÏóÜÏùå
+    }
 
-	while ((dirent_ptr = readdir(dir_ptr)) != NULL) {
-		if (strcmp(dirent_ptr->d_name, filename) == 0) {
-			return 1;
-		}
-	}
+    while ((dirent_ptr = readdir(dir_ptr)) != NULL) {
+        if (strcmp(dirent_ptr->d_name, filename) == 0) {
+            closedir(dir_ptr);
+            return 1; // ÌååÏùº Ï°¥Ïû¨
+        }
+    }
 
-	closedir(dir_ptr);
-	return 0;
+    closedir(dir_ptr);
+    return 0; // ÌååÏùº ÏóÜÏùå
 }
 
 void tty_mode(int how) {
-	static struct termios orig_mode;
-	if (how == 0) {
-		tcgetattr(0, &orig_mode);
-	} else if (how == 1) {
-		tcsetattr(0, TCSANOW, &orig_mode);
-	}
+    static struct termios orig_mode;
+    if (how == 0) {
+        tcgetattr(0, &orig_mode);
+    } else if (how == 1) {
+        tcsetattr(0, TCSANOW, &orig_mode);
+    }
 }
 
-void printMenu() {
-	printf("----------------------\n");
-	printf("1. Register\n");
-	printf("2. Login\n");
-	printf("3. quit\n");
-	printf("----------------------\n");
+void turnOffEchoAndIcanon() {
+    struct termios info;
+
+    tcgetattr(0, &info);
+    info.c_lflag &= ~ECHO;
+    info.c_lflag &= ~ICANON;
+    tcsetattr(0, TCSANOW, &info);
+}
+
+void printMenuUI() {
+    move(HEIGHT, LEFT);
+    addstr("<< DevTok >>");
+
+    move(HEIGHT + 5, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 6, LEFT - 9);
+    addstr("|         register(R)        |");
+    move(HEIGHT + 7, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 10, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 11, LEFT - 9);
+    addstr("|           join(J)          |");
+    move(HEIGHT + 12, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 15, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 16, LEFT - 9);
+    addstr("|           quit(Q)          |");
+    move(HEIGHT + 17, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 20, LEFT - 1);
+    addstr("Type a menu: ");
+}
+
+void loginSuccessMenu() {
+    initscr();
+    clear();
+
+    move(HEIGHT, LEFT - 3);
+    addstr("Welcome To DevTok");
+
+    move(HEIGHT + 3, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 4, LEFT - 9);
+    addstr("|          study(S)          |");
+    move(HEIGHT + 5, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 7, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 8, LEFT - 9);
+    addstr("|          record(R)         |");
+    move(HEIGHT + 9, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 11, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 12, LEFT - 9);
+    addstr("|          option(O)         |");
+    move(HEIGHT + 13, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 15, LEFT - 9);
+    addstr("------------------------------");
+    move(HEIGHT + 16, LEFT - 9);
+    addstr("|     back to StartMenu(B)   |");
+    move(HEIGHT + 17, LEFT - 9);
+    addstr("------------------------------");
+
+    move(HEIGHT + 20, LEFT - 1);
+    addstr("Type a menu: ");
+    refresh();
+
+    switch (getch()) {
+        case 'b': case 'B':
+            endwin();
+            break;
+
+        default:
+            endwin();
+            printf("ÏûòÎ™ªÎêú ÏûÖÎ†•ÏûÖÎãàÎã§. Î©îÏù∏ Î©îÎâ¥Î°ú ÎèåÏïÑÍ∞ëÎãàÎã§.\n");
+            sleep(1);
+            break;
+    }
 }
