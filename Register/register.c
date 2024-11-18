@@ -8,6 +8,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <curses.h>
+
+#define LEFT 50
+#define HEIGHT 5
+
+#define STORAGE "users" // ����ҷ� ����� ���丮 �̸�
 
 #define LEFT 50
 #define HEIGHT 5
