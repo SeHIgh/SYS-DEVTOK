@@ -8,18 +8,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <curses.h>
-
-#define LEFT 50
-#define HEIGHT 5
-
-#define STORAGE "users" // ����ҷ� ����� ���丮 �̸�
 
 #define LEFT 50
 #define HEIGHT 5
 
 void tty_mode(int);
 void turnOffEchoAndIcanon();
+void restoreSettings();
+void forceRestoreEcho(); 
 int find_filename(char *);
 void printMenuUI();
 void registerUser();
@@ -31,6 +27,7 @@ int main() {
 
     // 기존 터미널 설정 백업
     tty_mode(0);
+    atexit(restoreSettings); // 종료 시 설정 복원
 
     // 시작 시 ECHO, ICANON 비트 끄기
     turnOffEchoAndIcanon();
@@ -70,10 +67,23 @@ int main() {
         endwin(); // curses 종료
     }
 
-    // 터미널 설정 복원 후 프로그램 종료
-    tty_mode(1);
+    forceRestoreEcho(); // 강제로 ECHO 복원
     printf("프로그램 종료\n");
     return 0;
+}
+
+// 종료 시 설정 복원 함수
+void restoreSettings() {
+    tty_mode(1); // 터미널 설정 복원
+}
+
+//ECHO 복원
+void forceRestoreEcho() {
+    struct termios info;
+    tcgetattr(0, &info);     // 현재 설정 가져오기
+    info.c_lflag |= ECHO;    // ECHO 비트 켜기
+    info.c_lflag |= ICANON;  // ICANON 비트 켜기
+    tcsetattr(0, TCSANOW, &info); // 설정 적용
 }
 
 void registerUser() {
@@ -120,6 +130,24 @@ void loginUser() {
     } else {
         // 접속 실패 - 존재하지 않는 사용자
         printf("존재하지 않는 사용자입니다!\n");
+        printf("회원가입 하시겠습니까? (Y/N): ");
+    
+        char choice;
+        tty_mode(1); // 입력 받기 위해 설정 복원
+        scanf(" %c", &choice);
+
+        if (choice == 'Y' || choice == 'y') {
+            printf("회원가입 메뉴로 이동합니다.\n");
+            sleep(1);
+            endwin(); 
+            registerUser(); // 등록 함수 호출
+        } else if (choice == 'N' || choice == 'n') {
+            printf("메인 메뉴로 이동합니다.\n");
+            sleep(1);
+        } else {
+            printf("잘못된 입력입니다. 메인 메뉴로 이동합니다.\n");
+            sleep(1);
+        }
     }
 
     // 설정 복원 및 ECHO, ICANON 비트 끄기
@@ -129,7 +157,6 @@ void loginUser() {
 
 int find_filename(char* filename) {
     // 저장소 디렉토리에서 파일 검색
-
     DIR *dir_ptr;
     struct dirent *dirent_ptr;
 
@@ -154,9 +181,9 @@ int find_filename(char* filename) {
 void tty_mode(int how) {
     static struct termios orig_mode;
     if (how == 0) {
-        tcgetattr(0, &orig_mode);
+        tcgetattr(0, &orig_mode); // 현재 설정 저장
     } else if (how == 1) {
-        tcsetattr(0, TCSANOW, &orig_mode);
+        tcsetattr(0, TCSANOW, &orig_mode); // 설정 복원
     }
 }
 
@@ -164,8 +191,8 @@ void turnOffEchoAndIcanon() {
     struct termios info;
 
     tcgetattr(0, &info);
-    info.c_lflag &= ~ECHO;
-    info.c_lflag &= ~ICANON;
+    info.c_lflag &= ~ECHO;   // ECHO 비트 끄기
+    info.c_lflag &= ~ICANON; // ICANON 비트 끄기
     tcsetattr(0, TCSANOW, &info);
 }
 
