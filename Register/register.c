@@ -72,8 +72,7 @@ int main() {
         endwin(); // curses 종료
     }
 
-    printf("Program terminated
-");
+    printf("\ud504\ub85c\uadf8\ub7a8 \uc885\ub8cc\n");
     return 0;
 }
 
@@ -148,38 +147,31 @@ void registerUser() {
 void loginUser() {
     char filename[257]; // 사용자 이름 저장
 
-    printf("Enter your username (1 ~ 256 bytes): ");
+    printf("접속하실 사용자 이름을 입력해주세요.(1 ~ 256 bytes): ");
 
     tty_mode(1);
-    echo(); // 사용자 입력 허용
     scanf("%256s", filename);
-    noecho(); // 사용자 입력 다시 비활성화
 
     if (find_filename(filename)) {
-        printf("Login successful!
-");
+        printf("접속 성공!\n");
         sleep(1);
         endwin();
         loginSuccessMenu();
     } else {
-        printf("User does not exist!
-");
-        printf("Would you like to register? (Y/N): ");
+        printf("존재하지 않는 사용자입니다!\n");
+        printf("회원가입 하시겠습니까? (Y/N): ");
 
         char choice;
-        echo(); // 사용자 입력 허용
+        tty_mode(1);
         scanf(" %c", &choice);
-        noecho(); // 사용자 입력 다시 비활성화
 
         if (choice == 'Y' || choice == 'y') {
-            printf("Moving to registration menu.
-");
+            printf("회원가입 메뉴로 이동합니다.\n");
             sleep(1);
             endwin();
             registerUser();
         } else {
-            printf("Returning to main menu.
-");
+            printf("메인메뉴로 이동합니다.\n");
             sleep(1);
         }
     }
@@ -357,10 +349,8 @@ void setTargetTime() {
     refresh();
     wrefresh(win_1);
 
-    echo(); // 사용자 입력 허용
     mvwprintw(win_1, boxheight / 2, boxwidth / 2 - strlen(m1) / 2 - 3, "%s", m1);
     wscanw(win_1, "%d", &target_time);
-    noecho(); // 사용자 입력 다시 비활성화
 
     mvwprintw(win_2, 1, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
 
