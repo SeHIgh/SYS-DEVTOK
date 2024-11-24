@@ -48,6 +48,10 @@ int main(){
     
     //사용자 입력 대기
     int c = getch();
+     switch(c){
+        case '1': break; //내 기록 보기
+        case '2': break; //순위 보기
+    }
 
     //ncurses 종료
     endwin();
