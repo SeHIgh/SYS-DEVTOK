@@ -72,7 +72,8 @@ int main() {
         endwin(); // curses 종료
     }
 
-    printf("\ud504\ub85c\uadf8\ub7a8 \uc885\ub8cc\n");
+    printf("Program terminated
+");
     return 0;
 }
 
@@ -147,7 +148,7 @@ void registerUser() {
 void loginUser() {
     char filename[257]; // 사용자 이름 저장
 
-    printf("\uc811\uc18d\ud558\uc2e4 \uc0ac\uc6a9\uc790 \uc774\ub984\uc744 \uc785\ub825\ud574\uc8fc\uc138\uc694(1 ~ 256 bytes): ");
+    printf("Enter your username (1 ~ 256 bytes): ");
 
     tty_mode(1);
     echo(); // 사용자 입력 허용
@@ -155,13 +156,15 @@ void loginUser() {
     noecho(); // 사용자 입력 다시 비활성화
 
     if (find_filename(filename)) {
-        printf("\uc811\uc18d \uc131\uacf5!\n");
+        printf("Login successful!
+");
         sleep(1);
         endwin();
         loginSuccessMenu();
     } else {
-        printf("\uc874\uc7ac\ud558\uc9c0 \uc54a\ub294 \uc0ac\uc6a9\uc790\uc785\ub2c8\ub2e4!\n");
-        printf("\ud68c\uc6d0\uac00\uc785 \ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c? (Y/N): ");
+        printf("User does not exist!
+");
+        printf("Would you like to register? (Y/N): ");
 
         char choice;
         echo(); // 사용자 입력 허용
@@ -169,12 +172,14 @@ void loginUser() {
         noecho(); // 사용자 입력 다시 비활성화
 
         if (choice == 'Y' || choice == 'y') {
-            printf("\ud68c\uc6d0\uac00\uc785 \uba54\ub274\ub85c \uc774\ub3d9\ud569\ub2c8\ub2e4.\n");
+            printf("Moving to registration menu.
+");
             sleep(1);
             endwin();
             registerUser();
         } else {
-            printf("\uba54\uc778 \uba54\ub274\ub85c \uc774\ub3d9\ud569\ub2c8\ub2e4.\n");
+            printf("Returning to main menu.
+");
             sleep(1);
         }
     }
