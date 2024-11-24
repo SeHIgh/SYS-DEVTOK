@@ -72,7 +72,7 @@ int main() {
         endwin(); // curses 종료
     }
 
-    printf("\ud504\ub85c\uadf8\ub7a8 \uc885\ub8cc\n");
+    printf("프로그램 종료");
     return 0;
 }
 
@@ -349,8 +349,10 @@ void setTargetTime() {
     refresh();
     wrefresh(win_1);
 
+    echo();
     mvwprintw(win_1, boxheight / 2, boxwidth / 2 - strlen(m1) / 2 - 3, "%s", m1);
     wscanw(win_1, "%d", &target_time);
+    noecho();
 
     mvwprintw(win_2, 1, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
 
