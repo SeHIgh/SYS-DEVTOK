@@ -41,7 +41,7 @@ void print_user_info(const char *name)
     }
     else
     {
-        printf("사용자 %s를 찾을 수 없습니다.\n", name);
+        printf("사용자 %s 는 랭킹에 등록되지 않은 이름 입니다.\n", name);
     }
 }
 
