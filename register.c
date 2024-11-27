@@ -9,33 +9,36 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "./algorithm/ranking.h"    // 사용자 기록 보기 위해 추가
-
 #define LEFT 50
 #define HEIGHT 5
+
+typedef struct member {
+    int rank;
+    char* name;
+    int total_time;
+    int duration;
+} member;
 
 void tty_mode(int);
 void turnOffEchoAndIcanon();
 void restoreSettings();
-void forceRestoreEcho(); 
+void forceRestoreEcho(); // 강제로 ECHO 보용
 int find_filename(char *);
 void printMenuUI();
 void registerUser();
 void loginUser();
 void loginSuccessMenu();
-
-// 추가 4. 유저 이름의 폴더를 탐색하여 안의 내용을 출력하는 함수
-void recordUserInfo(const char *user_name);
-
-// 추가 1. 로그인한 사용자 이름을 저장할 전역 변수
-char user_name[257];
+void setTargetTime();
+void showAllRankings();
+void showMyRecord();
+void viewRecordMenu();
 
 int main() {
     int flag = 0; // 프로그램 종료 플래그
 
-    // 기존 터미널 설정 백업
+    // 기존 터미널 설정 백업 및 종료 시 보원 등록
     tty_mode(0);
-    atexit(restoreSettings); // 종료 시 설정 복원
+    atexit(forceRestoreEcho); // 종료 시 강제 보원 등록
 
     // 시작 시 ECHO, ICANON 비트 끄기
     turnOffEchoAndIcanon();
@@ -67,135 +70,195 @@ int main() {
                 break;
         }
 
-        // Enter 대기
-        if (getch() == '\n') {
-            sleep(1);
-        }
-
         endwin(); // curses 종료
     }
 
-    forceRestoreEcho(); // 강제로 ECHO 복원
-    printf("프로그램 종료\n");
+    printf("프로그램 종료");
     return 0;
 }
 
-// 종료 시 설정 복원 함수
-void restoreSettings() {
-    tty_mode(1); // 터미널 설정 복원
-}
-
-//ECHO 복원
 void forceRestoreEcho() {
     struct termios info;
     tcgetattr(0, &info);     // 현재 설정 가져오기
-    info.c_lflag |= ECHO;    // ECHO 비트 켜기
-    info.c_lflag |= ICANON;  // ICANON 비트 켜기
+    info.c_lflag |= ECHO;    // ECHO 켜기
+    info.c_lflag |= ICANON;  // ICANON 켜기
     tcsetattr(0, TCSANOW, &info); // 설정 적용
 }
 
 void registerUser() {
-    char filename[257]; // 사용자 이름 저장
+    initscr();
+    clear();
 
-    printf("등록하실 사용자 이름을 입력해주세요(1 ~ 256 bytes): ");
+    // 터미널 크기 가져오기
+    int height, width;
+    getmaxyx(stdscr, height, width);
 
-    // 이름 입력받을 때 잠깐 설정 되돌리기
-    tty_mode(1);
-    scanf("%256s", filename);
+    char* title = "<< Register >> ";
+    char* m1 = "set your NAME: ";
+    char* m2 = " was registered!";
+    char* m3 = " is already registered.";
+    char name[NAME_MAX];
 
-    if (find_filename(filename)) {
-        // 등록 실패 - 이미 있는 사용자 이름
-        printf("이미 있는 이름입니다!\n");
+    // 박스 크기 설정
+    int boxheight = 11;
+    int boxwidth = 30;
+
+    // 중앙 좌표 계산
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    // 새로운 WINDOW 생성
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty + 1, startx);
+    box(win_1, '|', '-');
+
+    WINDOW* win_2 = newwin(3, boxwidth, starty + 12, startx);
+    box(win_2, '|', '-');
+
+    // Title
+    mvprintw(starty - 1, width / 2 - strlen(title) / 2,"%s",title);
+    refresh();
+    wrefresh(win_1);
+
+    // 등록창
+    mvwprintw(win_1, boxheight / 2, boxwidth / 2 - strlen(m1) / 2 - 3, "%s", m1);
+    wrefresh(win_1);
+    echo(); // 사용자 입력 허용
+    mvwgetstr(win_1, boxheight / 2, boxwidth / 2 - strlen(m1) / 2 + strlen(m1) - 3, name);
+    noecho(); // 사용자 입력 다시 비활성화
+
+    // 이름 중복 확인 및 결과 표시
+    if (find_filename(name)) {
+        mvwprintw(win_2, 1, boxwidth / 2 - strlen(m3) / 2 - strlen(name) / 2, "[%s]%s", name, m3);
     } else {
-        // 등록 성공 - 사용자 파일 생성
         mkdir("users", 0777); // 디렉토리가 없으면 생성
         chdir("users");
-        creat(filename, 0777);
-        printf("등록 성공!\n");
+        creat(name, 0777); // 사용자 파일 생성
         chdir("..");
+        mvwprintw(win_2, 1, boxwidth / 2 - strlen(m2) / 2 - strlen(name) / 2, "[%s]%s", name, m2);
     }
 
-    // 설정 복원 및 ECHO, ICANON 비트 끄기
-    tty_mode(0);
-    turnOffEchoAndIcanon();
+    wrefresh(win_2);
+    getch(); // 사용자 입력 대기
+
+    delwin(win_1);
+    delwin(win_2);
+    endwin();
 }
 
 void loginUser() {
-    // 추가 2. 전역 변수 사용으로 인해 주석처리
-    //char filename[257]; // 사용자 이름 저장
+    // 터미널 크기 가져오기
+    initscr();
+    clear();
+    cbreak();
 
-    printf("접속하실 사용자 이름을 입력해주세요(1 ~ 256 bytes): ");
+    int height, width;
+    getmaxyx(stdscr, height, width);
 
-    // 이름 입력받을 때 잠깐 설정 되돌리기
-    tty_mode(1);
-    scanf("%256s", user_name);
+    char* title = "<< Login >> ";
+    char* m = "Type your NAME: ";
+    char* success = ">> connected!";
+    char* fail = "does not exist.";
+    char* question = "Sign up? (Y/N)";
+    char name[NAME_MAX];
 
-    if (find_filename(user_name)) {
-        // 접속 성공
-        printf("접속 성공!\n");
-        sleep(1);
+    // 박스 크기 설정
+    int boxheight = 11;
+    int boxwidth = 30;
+
+    // 중앙 좌표 계산
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    // 새로운 WINDOW 생성
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty + 1, startx);
+    box(win_1, '|', '-'); // 박스 그리기
+
+    WINDOW* win_2 = newwin(3, boxwidth, starty + 12, startx);
+
+    // Title
+    mvprintw(starty - 1, width / 2 - strlen(title) / 2, "%s", title);
+    refresh();
+    wrefresh(win_1);
+
+    // 로그인 창
+    mvwprintw(win_1, boxheight / 2, boxwidth / 2 - strlen(m) / 2 - 3, "%s", m);
+    wscanw(win_1, "%s", name);
+
+    refresh();
+    wrefresh(win_1);
+
+    // 이름 확인 및 결과 표시
+    if (find_filename(name)) {
+        mvwprintw(win_2, 1, boxwidth / 2 - strlen(success) / 2, "%s", success);
+        refresh();
+        wrefresh(win_2);
+        getch();
+        delwin(win_1);
+        delwin(win_2);
         endwin();
-        loginSuccessMenu(); // 로그인 성공 시 새로운 화면
+        loginSuccessMenu();
     } else {
-        // 접속 실패 - 존재하지 않는 사용자
-        printf("존재하지 않는 사용자입니다!\n");
-        printf("회원가입 하시겠습니까? (Y/N): ");
-    
-        char choice;
-        tty_mode(1); // 입력 받기 위해 설정 복원
-        scanf(" %c", &choice);
+        mvwprintw(win_2, 1, 1, ">> [%s] %s", name, fail);
+        refresh();
+        wrefresh(win_2);
+        getch();
+
+        delwin(win_1);
+        delwin(win_2);
+
+        // 회원가입 여부 묻는 창 생성
+        WINDOW* win_3 = newwin(5, boxwidth, starty + 15, startx);
+        box(win_3, '|', '-');
+        mvwprintw(win_3, 2, boxwidth / 2 - strlen(question) / 2, "%s", question);
+        refresh();
+        wrefresh(win_3);
+
+        char choice = wgetch(win_3); // 사용자 입력 받기
 
         if (choice == 'Y' || choice == 'y') {
-            printf("회원가입 메뉴로 이동합니다.\n");
-            sleep(1);
-            endwin(); 
-            registerUser(); // 등록 함수 호출
-        } else if (choice == 'N' || choice == 'n') {
-            printf("메인 메뉴로 이동합니다.\n");
-            sleep(1);
+            delwin(win_3);
+            endwin();
+            registerUser();
         } else {
-            printf("잘못된 입력입니다. 메인 메뉴로 이동합니다.\n");
+            mvwprintw(win_3, 3, boxwidth / 2 - 9, "Returning to menu...");
+            refresh();
+            wrefresh(win_3);
             sleep(1);
+            delwin(win_3);
+            endwin();
         }
     }
-
-    // 설정 복원 및 ECHO, ICANON 비트 끄기
-    tty_mode(0);
-    turnOffEchoAndIcanon();
 }
 
+
 int find_filename(char* filename) {
-    // 저장소 디렉토리에서 파일 검색
     DIR *dir_ptr;
     struct dirent *dirent_ptr;
 
-    // 추가 3. 전역 변수 (user_name)을 건들이지 않도록 임시 변수 사용
-    char full_filename[260]; // 유저이름의 파일을 저장할 임시 변수
-    snprintf(full_filename, sizeof(full_filename), "%s.txt", filename); // ".txt"를 붙임
+    strcat(filename, ".txt");
 
     if ((dir_ptr = opendir("users")) == NULL) {
         mkdir("users", 0777);
-        return 0; // 디렉토리가 없으면 파일도 없음
+        return 0;
     }
 
-    // 추가 4. while문의 비교문에서도 임시변수로 변경
     while ((dirent_ptr = readdir(dir_ptr)) != NULL) {
-        if (strcmp(dirent_ptr->d_name, full_filename) == 0) {
+        if (strcmp(dirent_ptr->d_name, filename) == 0) {
             closedir(dir_ptr);
-            return 1; // 파일 존재
+            return 1;
         }
     }
 
     closedir(dir_ptr);
-    return 0; // 파일 없음
+    return 0;
 }
 
 void tty_mode(int how) {
     static struct termios orig_mode;
     if (how == 0) {
-        tcgetattr(0, &orig_mode); // 현재 설정 저장
+        tcgetattr(0, &orig_mode);
     } else if (how == 1) {
-        tcsetattr(0, TCSANOW, &orig_mode); // 설정 복원
+        tcsetattr(0, TCSANOW, &orig_mode);
     }
 }
 
@@ -203,149 +266,294 @@ void turnOffEchoAndIcanon() {
     struct termios info;
 
     tcgetattr(0, &info);
-    info.c_lflag &= ~ECHO;   // ECHO 비트 끄기
-    info.c_lflag &= ~ICANON; // ICANON 비트 끄기
+    info.c_lflag &= ~ECHO;
+    info.c_lflag &= ~ICANON;
     tcsetattr(0, TCSANOW, &info);
 }
 
 void printMenuUI() {
-    move(HEIGHT, LEFT);
-    addstr("<< DevTok >>");
+    int height, width;
+    getmaxyx(stdscr, height, width);
 
-    move(HEIGHT + 5, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 6, LEFT - 9);
-    addstr("|         register(R)        |");
-    move(HEIGHT + 7, LEFT - 9);
-    addstr("------------------------------");
+    char* welcome = "<< Welcome To DevTok >> ";
+    char* m1 = "1.  register(R)";
+    char* m2 = "2.  join(J)";
+    char* m3 = "3.  exit(Q)";
+    char* choice = "enter the menu: ";
 
-    move(HEIGHT + 10, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 11, LEFT - 9);
-    addstr("|           join(J)          |");
-    move(HEIGHT + 12, LEFT - 9);
-    addstr("------------------------------");
+    int boxheight = 13;
+    int boxwidth = 30;
 
-    move(HEIGHT + 15, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 16, LEFT - 9);
-    addstr("|           quit(Q)          |");
-    move(HEIGHT + 17, LEFT - 9);
-    addstr("------------------------------");
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
 
-    move(HEIGHT + 20, LEFT - 1);
-    addstr("Type a menu: ");
+    mvprintw(starty - 4, width / 2 - strlen(welcome) / 2, "%s", welcome);
+
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty, startx);
+    box(win_1, '|', '-');
+
+    mvwprintw(win_1, 3, boxwidth / 2 - strlen(m1) / 2, "%s", m1);
+    mvwprintw(win_1, 6, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
+    mvwprintw(win_1, 9, boxwidth / 2 - strlen(m3) / 2, "%s", m3);
+
+    WINDOW* win_2 = newwin(3, boxwidth, starty + boxheight, startx);
+    mvwprintw(win_2, 1, boxwidth / 2 - strlen(choice) / 2, "%s", choice);
+
+    refresh();
+    wrefresh(win_1);
+    wrefresh(win_2);
+
+    delwin(win_1);
+    delwin(win_2);
 }
 
 void loginSuccessMenu() {
     initscr();
     clear();
+    noecho();
 
-    move(HEIGHT, LEFT - 3);
-    addstr("Welcome To DevTok");
+    int height, width;
+    getmaxyx(stdscr, height, width);
 
-    move(HEIGHT + 3, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 4, LEFT - 9);
-    addstr("|          study(S)          |");
-    move(HEIGHT + 5, LEFT - 9);
-    addstr("------------------------------");
+    char* welcome = "DevTok";
+    char* m1 = "1.  study ";
+    char* m2 = "2.  view record";
+    char* m3 = "3.  return";
+    char* choice = "enter the menu: ";
 
-    move(HEIGHT + 7, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 8, LEFT - 9);
-    addstr("|          record(R)         |");
-    move(HEIGHT + 9, LEFT - 9);
-    addstr("------------------------------");
+    int boxheight = 3;
+    int boxwidth = 30;
 
-    move(HEIGHT + 11, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 12, LEFT - 9);
-    addstr("|          option(O)         |");
-    move(HEIGHT + 13, LEFT - 9);
-    addstr("------------------------------");
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
 
-    move(HEIGHT + 15, LEFT - 9);
-    addstr("------------------------------");
-    move(HEIGHT + 16, LEFT - 9);
-    addstr("|     back to StartMenu(B)   |");
-    move(HEIGHT + 17, LEFT - 9);
-    addstr("------------------------------");
+    mvprintw(starty - 8, width / 2 - strlen(welcome) / 2, "%s", welcome);
 
-    move(HEIGHT + 20, LEFT - 1);
-    addstr("Type a menu: ");
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty - 5, startx);
+    box(win_1, '|', '-');
+
+    WINDOW* win_2 = newwin(boxheight, boxwidth, starty - 2, startx);
+    box(win_2, '|', '-');
+
+    WINDOW* win_3 = newwin(boxheight, boxwidth, starty + 1, startx);
+    box(win_3, '|', '-');
+
+    WINDOW* win_4 = newwin(boxheight, boxwidth, starty + 8, startx);
+    mvwprintw(win_1, 1, boxwidth / 2 - strlen(m1) / 2, "%s", m1);
+    mvwprintw(win_2, 1, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
+    mvwprintw(win_3, 1, boxwidth / 2 - strlen(m3) / 2, "%s", m3);
+    mvwprintw(win_4, 1, boxwidth / 2 - strlen(choice) / 2, "%s", choice);
+
     refresh();
+    wrefresh(win_1);
+    wrefresh(win_2);
+    wrefresh(win_3);
+    wrefresh(win_4);
 
-    switch (getch()) {
-        case 'b': case 'B':
-            endwin();
-            break;
-
-        case 'r' : case 'R':
-            endwin();
-            // 이전에 입력받은 사용자 이름으로 사용자 정보 출력
-            // print_user_info(user_name);
-            recordUserInfo(user_name);
-            break;
-
-        default:
-            endwin();
-            printf("잘못된 입력입니다. 메인 메뉴로 돌아갑니다.\n");
-            sleep(1);
-            break;
+    int c = getch();
+    switch (c) {
+        case '1': setTargetTime(); break;
+        case '2': viewRecordMenu(); break;
+        case '3': endwin(); return;
     }
+
+    delwin(win_1);
+    delwin(win_2);
+    delwin(win_3);
+    delwin(win_4);
+    endwin();
 }
 
-void recordUserInfo(const char *user_name) {
-    char user_filename[MAX_NAME_LENGTH + 4]; // 파일 이름을 저장할 배열
-    snprintf(user_filename, sizeof(user_filename), "users/%s.txt", user_name); // 파일 경로 생성
+void viewRecordMenu() {
+    initscr();
+    clear();
+    noecho();
 
-    FILE *file_ptr = fopen(user_filename, "r"); // 파일 열기
-    if (file_ptr == NULL) {
-        printf("사용자 %s 의 정보를 불러오는 데 실패했습니다.\n", user_name);
-        return; // 파일이 없으면 종료
+    int height, width;
+    getmaxyx(stdscr, height, width);
+
+    char* title = "<< view record >>";
+    char* m1 = "1. my record";
+    char* m2 = "2. Ranking";
+    char* choice = "enter the menu: ";
+
+    int boxheight = 7;
+    int boxwidth = 30;
+
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    mvprintw(starty - 3, width / 2 - strlen(title) / 2, "%s", title);
+
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty, startx);
+    box(win_1, '|', '-');
+
+    WINDOW* win_2 = newwin(boxheight, boxwidth, starty + 8, startx);
+    mvwprintw(win_1, 2, boxwidth / 2 - strlen(m1) / 2, "%s", m1);
+    mvwprintw(win_1, 4, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
+    mvwprintw(win_2, 1, boxwidth / 2 - strlen(choice) / 2, "%s", choice);
+
+    refresh();
+    wrefresh(win_1);
+    wrefresh(win_2);
+
+    int c = getch();
+    switch (c) {
+        case '1': showMyRecord(); break;
+        case '2': showAllRankings(); break;
     }
 
-    char line[256]; // 파일에서 읽을 줄을 저장할 배열
-    printf("\n사용자 %s 의 공부 기록:\n\n", user_name);
+    delwin(win_1);
+    delwin(win_2);
+    clear();
+    refresh();
+    loginSuccessMenu();
+}
 
-    // 첫 줄 처리 (누적시간, 연속시간)
-    if (fgets(line, sizeof(line), file_ptr) != NULL) {
-        size_t len = strlen(line);
-        if (len > 0 && line[len - 1] == '\n') {
-            line[len - 1] = '\0'; // 개행 문자 제거
-        }
 
-        char total_time[32], streak_time[32];
-        if (sscanf(line, "%31s %31s", total_time, streak_time) == 2) {
-            printf("누적 시간: %s\n", total_time);
-            printf("연속 시간: %s\n\n", streak_time);
-        } else {
-            printf("파일의 첫 줄 형식이 잘못되었습니다.\n");
-            fclose(file_ptr);
-            return;
-        }
+void setTargetTime() {
+    initscr();
+    clear();
+    int height, width;
+    getmaxyx(stdscr, height, width);
+
+    char* title = "<< Goal >>";
+    char* m1 = "set your target_time: ";
+    char* m2 = "target_time was set!";
+    int target_time;
+
+    int boxheight = 11;
+    int boxwidth = 40;
+
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty + 1, startx);
+    box(win_1, '|', '-');
+
+    WINDOW* win_2 = newwin(3, boxwidth, starty + 12, startx);
+
+    mvprintw(starty - 1, width / 2 - strlen(title) / 2, "%s", title);
+    refresh();
+    wrefresh(win_1);
+
+    echo();
+    mvwprintw(win_1, boxheight / 2, boxwidth / 2 - strlen(m1) / 2 - 3, "%s", m1);
+    wscanw(win_1, "%d", &target_time);
+    noecho();
+
+    mvwprintw(win_2, 1, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
+
+    refresh();
+    wrefresh(win_2);
+
+    getchar();
+    delwin(win_1);
+    delwin(win_2);
+    loginSuccessMenu(); // 로그인 성공 화면으로 돌아갈 수 있도록 수정
+}
+
+// 추가 : 전체 랭킹 보기
+void showAllRankings() {
+    clear();
+    noecho();
+
+    char* title = "<< All Rankings >>";
+    char* menu = "Ranking           Name            Total Time         Duration";
+
+    int count = 7;
+    member m[7] = {
+        {1, "aaaaa", 3600000, 400},
+        {2, "bbbbb", 3400000, 500},
+        {3, "ccccc", 3300000, 600},
+        {4, "ddddd", 3000000, 400},
+        {5, "eeeee", 2800000, 500},
+        {6, "fffff", 2400000, 200},
+        {7, "ggggg", 2100000, 500}
+    };
+
+    int height, width;
+    getmaxyx(stdscr, height, width);
+
+    int boxheight = 3;
+    int boxwidth = 80;
+
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    mvprintw(starty - 10, width / 2 - strlen(title) / 2, "%s", title);
+
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty - 8, startx);
+    box(win_1, '|', '=');
+
+    WINDOW* win_2 = newwin(20, boxwidth, starty - 5, startx);
+    box(win_2, '|', '-');
+
+    mvwprintw(win_1, 1, boxwidth / 2 - strlen(menu) / 2, "%s", menu);
+
+    for (int i = 0; i < count; i++) {
+        mvwprintw(win_2, 2 + i * 2, boxwidth / 2 - 25, "%d", m[i].rank);
+        mvwprintw(win_2, 2 + i * 2, boxwidth / 2 - 12, "%s", m[i].name);
+        mvwprintw(win_2, 2 + i * 2, boxwidth / 2 + 5, "%d", m[i].total_time);
+        mvwprintw(win_2, 2 + i * 2, boxwidth / 2 + 26, "%d", m[i].duration);
     }
 
-    // 테이블 헤더 출력
-    printf("| %-16s | %-16s | %-32s\n", "공부 시작 시간", "공부한 시간", "코멘트");
-    printf("+----------------+-------------+--------------------------------+\n");
+    refresh();
+    wrefresh(win_1);
+    wrefresh(win_2);
 
-    // 나머지 줄 처리
-    while (fgets(line, sizeof(line), file_ptr) != NULL) {
-        size_t len = strlen(line);
-        if (len > 0 && line[len - 1] == '\n') {
-            line[len - 1] = '\0'; // 개행 문자 제거
-        }
+    getch();
 
-        char start_time[32], study_duration[32], comment[160];
-        if (sscanf(line, "%31s %31s %159[^\n]", start_time, study_duration, comment) == 3) {
-            printf("| %-14s | %-11s | %-32s\n", start_time, study_duration, comment);
-        } else {
-            printf("| %-14s | %-11s | %-32s\n", "잘못된 형식", "-", "-");
-        }
-    }
+    delwin(win_1);
+    delwin(win_2);
+    clear();
+    refresh();
+    loginSuccessMenu(); // 로그인 성공 화면으로 돌아가도록 수정
+}
 
-    printf("+----------------+-------------+--------------------------------+\n");
-    fclose(file_ptr); // 파일 닫기
+// 추가 : 내 기록 보기
+void showMyRecord() {
+    clear();
+    noecho();
+
+    int height, width;
+    getmaxyx(stdscr, height, width);
+
+    member m = {2, "aaa", 2010, 400};
+
+    char* title = "<< My Record >>";
+    char* m1 = "Ranking     : ";
+    char* m2 = "Total Time  : ";
+    char* m3 = "Duration    : ";
+
+    int boxheight = 13;
+    int boxwidth = 50;
+
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    mvprintw(starty - 5, width / 2 - strlen(title) / 2, "%s", title);
+
+    WINDOW* win_1 = newwin(3, boxwidth, starty - 2, startx);
+    box(win_1, '|', '=');
+    mvwprintw(win_1, 1, 20, "%s's record", m.name);
+
+    WINDOW* win_2 = newwin(boxheight, boxwidth, starty + 1, startx);
+    box(win_2, '|', '-');
+
+    mvwprintw(win_2, 3, 5, "%s%d", m1, m.rank);
+    mvwprintw(win_2, 6, 5, "%s%d", m2, m.total_time);
+    mvwprintw(win_2, 9, 5, "%s%d", m3, m.duration);
+
+    refresh();
+    wrefresh(win_1);
+    wrefresh(win_2);
+
+    getch();
+
+    delwin(win_1);
+    delwin(win_2);
+    clear();
+    refresh();
+    loginSuccessMenu(); // 로그인 성공 화면으로 돌아가도록 수정
 }
