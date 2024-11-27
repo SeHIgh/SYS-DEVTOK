@@ -31,6 +31,7 @@ void loginSuccessMenu();
 void setTargetTime();
 void showAllRankings();
 void showMyRecord();
+void viewRecordMenu();
 
 int main() {
     int flag = 0; // 프로그램 종료 플래그
@@ -145,40 +146,90 @@ void registerUser() {
 }
 
 void loginUser() {
-    char filename[257]; // 사용자 이름 저장
+    // 터미널 크기 가져오기
+    initscr();
+    clear();
+    cbreak();
 
-    printf("접속하실 사용자 이름을 입력해주세요.(1 ~ 256 bytes): ");
+    int height, width;
+    getmaxyx(stdscr, height, width);
 
-    tty_mode(1);
-    scanf("%256s", filename);
+    char* title = "<< Login >> ";
+    char* m = "Type your NAME: ";
+    char* success = ">> connected!";
+    char* fail = "does not exist.";
+    char* question = "Sign up? (Y/N)";
+    char name[NAME_MAX];
 
-    if (find_filename(filename)) {
-        printf("접속 성공!\n");
-        sleep(1);
+    // 박스 크기 설정
+    int boxheight = 11;
+    int boxwidth = 30;
+
+    // 중앙 좌표 계산
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    // 새로운 WINDOW 생성
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty + 1, startx);
+    box(win_1, '|', '-'); // 박스 그리기
+
+    WINDOW* win_2 = newwin(3, boxwidth, starty + 12, startx);
+
+    // Title
+    mvprintw(starty - 1, width / 2 - strlen(title) / 2, "%s", title);
+    refresh();
+    wrefresh(win_1);
+
+    // 로그인 창
+    mvwprintw(win_1, boxheight / 2, boxwidth / 2 - strlen(m) / 2 - 3, "%s", m);
+    wscanw(win_1, "%s", name);
+
+    refresh();
+    wrefresh(win_1);
+
+    // 이름 확인 및 결과 표시
+    if (find_filename(name)) {
+        mvwprintw(win_2, 1, boxwidth / 2 - strlen(success) / 2, "%s", success);
+        refresh();
+        wrefresh(win_2);
+        getch();
+        delwin(win_1);
+        delwin(win_2);
         endwin();
         loginSuccessMenu();
     } else {
-        printf("존재하지 않는 사용자입니다!\n");
-        printf("회원가입 하시겠습니까? (Y/N): ");
+        mvwprintw(win_2, 1, 1, ">> [%s] %s", name, fail);
+        refresh();
+        wrefresh(win_2);
+        getch();
 
-        char choice;
-        tty_mode(1);
-        scanf(" %c", &choice);
+        delwin(win_1);
+        delwin(win_2);
+
+        // 회원가입 여부 묻는 창 생성
+        WINDOW* win_3 = newwin(5, boxwidth, starty + 15, startx);
+        box(win_3, '|', '-');
+        mvwprintw(win_3, 2, boxwidth / 2 - strlen(question) / 2, "%s", question);
+        refresh();
+        wrefresh(win_3);
+
+        char choice = wgetch(win_3); // 사용자 입력 받기
 
         if (choice == 'Y' || choice == 'y') {
-            printf("회원가입 메뉴로 이동합니다.\n");
-            sleep(1);
+            delwin(win_3);
             endwin();
             registerUser();
         } else {
-            printf("메인메뉴로 이동합니다.\n");
+            mvwprintw(win_3, 3, boxwidth / 2 - 9, "Returning to menu...");
+            refresh();
+            wrefresh(win_3);
             sleep(1);
+            delwin(win_3);
+            endwin();
         }
     }
-
-    tty_mode(0);
-    turnOffEchoAndIcanon();
 }
+
 
 int find_filename(char* filename) {
     DIR *dir_ptr;
@@ -266,9 +317,8 @@ void loginSuccessMenu() {
 
     char* welcome = "DevTok";
     char* m1 = "1.  study ";
-    char* m2 = "2.  ranking";
-    char *m3 = "3.  My record";
-    char* m4 = "4.  return";
+    char* m2 = "2.  view record";
+    char* m3 = "3.  return";
     char* choice = "enter the menu: ";
 
     int boxheight = 3;
@@ -288,40 +338,78 @@ void loginSuccessMenu() {
     WINDOW* win_3 = newwin(boxheight, boxwidth, starty + 1, startx);
     box(win_3, '|', '-');
 
-    WINDOW* win_4 = newwin(boxheight, boxwidth, starty + 4, startx);
-    box(win_4, '|', '-');
-
-    WINDOW* win_5 = newwin(boxheight, boxwidth, starty + 8, startx);
-
+    WINDOW* win_4 = newwin(boxheight, boxwidth, starty + 8, startx);
     mvwprintw(win_1, 1, boxwidth / 2 - strlen(m1) / 2, "%s", m1);
     mvwprintw(win_2, 1, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
     mvwprintw(win_3, 1, boxwidth / 2 - strlen(m3) / 2, "%s", m3);
-    mvwprintw(win_4, 1, boxwidth / 2 - strlen(m4) / 2, "%s", m4);
-    mvwprintw(win_5, 1, boxwidth / 2 - strlen(choice) / 2, "%s", choice);
+    mvwprintw(win_4, 1, boxwidth / 2 - strlen(choice) / 2, "%s", choice);
 
     refresh();
     wrefresh(win_1);
     wrefresh(win_2);
     wrefresh(win_3);
     wrefresh(win_4);
-    wrefresh(win_5);
 
     int c = getch();
     switch (c) {
         case '1': setTargetTime(); break;
-        case '2': showAllRankings(); break;
-        case '3': showMyRecord(); break;
-        case '4': endwin(); return;
+        case '2': viewRecordMenu(); break;
+        case '3': endwin(); return;
     }
 
     delwin(win_1);
     delwin(win_2);
     delwin(win_3);
     delwin(win_4);
-    delwin(win_5);
-
     endwin();
 }
+
+void viewRecordMenu() {
+    initscr();
+    clear();
+    noecho();
+
+    int height, width;
+    getmaxyx(stdscr, height, width);
+
+    char* title = "<< view record >>";
+    char* m1 = "1. my record";
+    char* m2 = "2. Ranking";
+    char* choice = "enter the menu: ";
+
+    int boxheight = 7;
+    int boxwidth = 30;
+
+    int starty = (height - boxheight) / 2;
+    int startx = (width - boxwidth) / 2;
+
+    mvprintw(starty - 3, width / 2 - strlen(title) / 2, "%s", title);
+
+    WINDOW* win_1 = newwin(boxheight, boxwidth, starty, startx);
+    box(win_1, '|', '-');
+
+    WINDOW* win_2 = newwin(boxheight, boxwidth, starty + 8, startx);
+    mvwprintw(win_1, 2, boxwidth / 2 - strlen(m1) / 2, "%s", m1);
+    mvwprintw(win_1, 4, boxwidth / 2 - strlen(m2) / 2, "%s", m2);
+    mvwprintw(win_2, 1, boxwidth / 2 - strlen(choice) / 2, "%s", choice);
+
+    refresh();
+    wrefresh(win_1);
+    wrefresh(win_2);
+
+    int c = getch();
+    switch (c) {
+        case '1': showMyRecord(); break;
+        case '2': showAllRankings(); break;
+    }
+
+    delwin(win_1);
+    delwin(win_2);
+    clear();
+    refresh();
+    loginSuccessMenu();
+}
+
 
 void setTargetTime() {
     initscr();
